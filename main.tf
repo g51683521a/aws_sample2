@@ -1,0 +1,109 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.16"
+    }
+  }
+
+  required_version = ">= 1.2.0"
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+locals {
+  availability_zones = ["${var.aws_region}a", "${var.aws_region}c"]
+}
+
+# ========================= VPC network design =========================
+# https://javatodev.com/how-to-build-aws-vpc-using-terraform-step-by-step/#Define_provider_with_an_AWS_region
+# VPC
+resource "aws_vpc" "vpc" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name        = "${var.environment}-vpc"
+    Environment = var.environment
+  }
+}
+
+# Public subnet
+resource "aws_subnet" "public_subnet" {
+  vpc_id                  = aws_vpc.vpc.id
+  count                   = length(var.public_subnets_cidr)
+  cidr_block              = element(var.public_subnets_cidr, count.index)
+  availability_zone       = element(local.availability_zones, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = "${var.environment}-${element(local.availability_zones, count.index)}-public_subnet"
+    Environment = "${var.environment}"
+  }
+}
+
+# Private Subnet
+resource "aws_subnet" "private_subnet" {
+  vpc_id                  = aws_vpc.vpc.id
+  count                   = length(var.private_subnets_cidr)
+  cidr_block              = element(var.private_subnets_cidr, count.index)
+  availability_zone       = element(local.availability_zones, count.index)
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name        = "${var.environment}-${element(local.availability_zones, count.index)}-private_subnet"
+    Environment = "${var.environment}"
+  }
+}
+
+#Internet gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.vpc.id
+  tags = {
+    "Name"        = "${var.environment}-igw"
+    "Environment" = var.environment
+  }
+}
+
+# Routing tables to route traffic for Public Subnet
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    Name        = "${var.environment}-public_rt"
+    Environment = "${var.environment}"
+  }
+}
+
+# Routing tables to route traffic for Private Subnet
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.vpc.id
+  tags = {
+    Name        = "${var.environment}-private_rt"
+    Environment = "${var.environment}"
+  }
+}
+
+# Route for Internet Gateway
+resource "aws_route" "public_route" {
+  route_table_id         = aws_route_table.public_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw.id
+}
+
+# Route table associations for both Public & Private Subnets
+resource "aws_route_table_association" "public_rta" {
+  count          = length(var.public_subnets_cidr)
+  subnet_id      = element(aws_subnet.public_subnet.*.id, count.index)
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "private_rta" {
+  count          = length(var.private_subnets_cidr)
+  subnet_id      = element(aws_subnet.private_subnet.*.id, count.index)
+  route_table_id = aws_route_table.private_rt.id
+}
+
