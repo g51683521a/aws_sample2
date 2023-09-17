@@ -142,8 +142,8 @@ resource "aws_security_group" "private_security_group" {
 
   ingress {
     description      = "SQL Server port"
-    from_port        = 22
-    to_port          = 22
+    from_port        = 5432
+    to_port          = 5432
     protocol         = "tcp"
     security_groups = ["${aws_security_group.public_sg.id}"]
   }
@@ -167,15 +167,41 @@ resource "aws_security_group" "private_security_group" {
 resource "aws_instance" "public_instance" {
   ami           = "ami-0f844a9675b22ea32" # Amazon Linux 2 AMI (HVM)
   instance_type = "t2.micro"
-  key_name = var.ssh_key_pair
+  key_name      = var.ssh_key_pair
 
-  count                   = length(var.public_subnets_cidr)
-  availability_zone       = element(local.availability_zones, count.index)
-  subnet_id = element(aws_subnet.public_subnet.*.id, count.index)
-  vpc_security_group_ids = [ aws_security_group.public_sg.id ]
+  count                       = length(var.public_subnets_cidr)
+  availability_zone           = element(local.availability_zones, count.index)
+  subnet_id                   = element(aws_subnet.public_subnet.*.id, count.index)
+  vpc_security_group_ids      = [ aws_security_group.public_sg.id ]
   associate_public_ip_address = true
 
   tags = {
     Name        = "${var.environment}-public_ec2-${count.index}"
   }
+}
+
+# ========================= Amazon RDS =========================
+resource "aws_db_subnet_group" "db_subnet_group" {
+  name        = "${var.environment}-db_subnet_group"
+  description = "db_subnet_group for Amazon RDS"
+  subnet_ids  = aws_subnet.private_subnet.*.id
+
+  tags = {
+    Name = "${var.environment}-db_subnet_group"
+  }
+}
+
+resource "aws_db_instance" "psql-dev-db" {
+  identifier             = "psql-dev-db"
+  engine                 = "postgres"
+  engine_version         = "14.8"
+  instance_class         = "db.t3.micro"
+  allocated_storage      = 20
+  max_allocated_storage  = 1000
+  username               = "postgres"
+  password               = "postgres123"
+  parameter_group_name   = "default.postgres14"
+  db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
+  vpc_security_group_ids = [aws_security_group.private_security_group.id]
+  skip_final_snapshot    = true
 }
