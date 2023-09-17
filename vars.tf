@@ -24,7 +24,7 @@ variable "private_subnets_cidr" {
 }
 
 variable "my_home_ip" {
-  default     = "29.237.55.73/32" # changeme
+  default     = "119.0.0.0/8" # changeme
 }
 
 variable "ssh_key_pair" {
