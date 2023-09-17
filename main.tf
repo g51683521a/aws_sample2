@@ -165,7 +165,7 @@ resource "aws_security_group" "private_security_group" {
 # https://www.sammeechward.com/terraform-vpc-subnets-ec2-and-more
 # One EC2 instance per public subnet
 resource "aws_instance" "public_instance" {
-  ami           = "ami-0f844a9675b22ea32" # Amazon Linux 2 AMI (HVM)
+  ami           = "ami-04cb4ca688797756f" # Amazon Linux 2023 AMI
   instance_type = "t2.micro"
   key_name      = var.ssh_key_pair
 
@@ -174,6 +174,12 @@ resource "aws_instance" "public_instance" {
   subnet_id                   = element(aws_subnet.public_subnet.*.id, count.index)
   vpc_security_group_ids      = [ aws_security_group.public_sg.id ]
   associate_public_ip_address = true
+
+  user_data = <<EOF
+#!/bin/bash
+sudo dnf update
+sudo dnf install -y postgresql15
+EOF  
 
   tags = {
     Name        = "${var.environment}-public_ec2-${count.index}"
