@@ -107,3 +107,56 @@ resource "aws_route_table_association" "private_rta" {
   route_table_id = aws_route_table.private_rt.id
 }
 
+# ========================= Security Group =========================
+resource "aws_security_group" "public_sg" {
+  name = "${var.environment}-public-sg"
+  description = "Allow my SSH traffic publicSG"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description      = "SSH from my Home"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = [ var.my_home_ip ]
+    ipv6_cidr_blocks = []
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name        = "${var.environment}-public-sg"
+  }
+}
+
+resource "aws_security_group" "private_security_group" {
+  name = "${var.environment}-private-sg"
+  description = "Allow my SSH traffic privateSG"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    description      = "SQL Server port"
+    from_port        = 3306
+    to_port          = 3306
+    protocol         = "tcp"
+    security_groups = ["${aws_security_group.public_sg.id}"]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name        = "${var.environment}-private-sg"
+  }
+}
