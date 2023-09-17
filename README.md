@@ -1,5 +1,5 @@
-# aws_sample1
-AWS sample1 - 2 Public + 2 Private subnet with 1 instance in each subnet
+# aws_sample2
+AWS sample2 - 2 Public (with 2 instance) + 2 Private subnet with 1 RDS
 
 VPC
 - 10.0.0.0/16
