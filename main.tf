@@ -142,8 +142,8 @@ resource "aws_security_group" "private_security_group" {
 
   ingress {
     description      = "SQL Server port"
-    from_port        = 3306
-    to_port          = 3306
+    from_port        = 22
+    to_port          = 22
     protocol         = "tcp"
     security_groups = ["${aws_security_group.public_sg.id}"]
   }
@@ -158,5 +158,24 @@ resource "aws_security_group" "private_security_group" {
 
   tags = {
     Name        = "${var.environment}-private-sg"
+  }
+}
+
+# ========================= EC2 instance =========================
+# https://www.sammeechward.com/terraform-vpc-subnets-ec2-and-more
+# One EC2 instance per public subnet
+resource "aws_instance" "public_instance" {
+  ami           = "ami-0f844a9675b22ea32" # Amazon Linux 2 AMI (HVM)
+  instance_type = "t2.micro"
+  key_name = var.ssh_key_pair
+
+  count                   = length(var.public_subnets_cidr)
+  availability_zone       = element(local.availability_zones, count.index)
+  subnet_id = element(aws_subnet.public_subnet.*.id, count.index)
+  vpc_security_group_ids = [ aws_security_group.public_sg.id ]
+  associate_public_ip_address = true
+
+  tags = {
+    Name        = "${var.environment}-public_ec2-${count.index}"
   }
 }
